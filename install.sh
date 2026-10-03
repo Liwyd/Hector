@@ -1,11 +1,11 @@
 #!/bin/bash
 
 ### Basic setup
-USERNAME="ErfJabs"
+USERNAME="Liwyd"
 SCRIPT_NAME="hector"
 # Branch the script installs/updates itself from. Override for testing: HECTOR_BRANCH=dev
 DEFAULT_BRANCH="${HECTOR_BRANCH:-master}"
-INSTALL_BASE_DIR="/opt/erfjab/${SCRIPT_NAME}"
+INSTALL_BASE_DIR="/opt/${SCRIPT_NAME}"
 REPO_URL="https://github.com/${USERNAME}/${SCRIPT_NAME}.git"
 
 ### Color variables
@@ -86,6 +86,7 @@ check_not_exists() {
 subscription_show_env() {
     # open instance env file in nano editor
     local instance_name="$1"
+    check_instance_name "$instance_name"
     local instance_dir="$INSTALL_BASE_DIR/$instance_name"
     local env_file="$instance_dir/.env"
     if [[ ! -f "$env_file" ]]; then
@@ -611,7 +612,7 @@ case "$1" in
         echo "  script-remove      Remove the $SCRIPT_NAME script"
         echo "  help               Show this help message"
         echo
-        echo "Telegram: https://t.me/erfjabs"
+        echo "Repository: https://github.com/$USERNAME/$SCRIPT_NAME"
         ;;
     *)
         error "Invalid command. Use '$SCRIPT_NAME help' for full usage instructions."
