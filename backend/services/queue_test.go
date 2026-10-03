@@ -288,6 +288,66 @@ func TestQueueBuildsWhenStockReturns(t *testing.T) {
 	}
 }
 
+// TestQueueAddAcceptsAnotherOrderAfterBuilt — a built order stays in the log,
+// but it must not hold the type and location: the next order needs the queue
+// as soon as the type sells out again.
+func TestQueueAddAcceptsAnotherOrderAfterBuilt(t *testing.T) {
+	resetQueue(t, t.TempDir())
+	m := newQueueMock(t)
+
+	if _, err := QueueAdd(queuedRequest()); err != nil {
+		t.Fatalf("QueueAdd: %v", err)
+	}
+	m.available.Store(true)
+	due(t)
+	if _, err := checkQueueOnce(context.Background()); err != nil {
+		t.Fatalf("checkQueueOnce: %v", err)
+	}
+	if only(t).Status != queueStatusDone {
+		t.Fatalf("first order was not built")
+	}
+
+	m.available.Store(false)
+	if _, err := QueueAdd(queuedRequest()); err != nil {
+		t.Fatalf("add after a built order: %v", err)
+	}
+	if got := len(QueueList().Entries); got != 2 {
+		t.Fatalf("queue holds %d entries, want 2 (the log and the new order)", got)
+	}
+	// the new entry is the one being polled
+	due(t)
+	if _, err := checkQueueOnce(context.Background()); err != nil {
+		t.Fatalf("checkQueueOnce: %v", err)
+	}
+	if m.creates.Load() != 1 {
+		t.Fatalf("POST /servers hit %d times, want 1 (still out of stock)", m.creates.Load())
+	}
+}
+
+// TestQueueFullIgnoresFinishedOrders — the cap is on standing orders, so a
+// queue of built ones can never be the reason the next order is refused.
+func TestQueueFullIgnoresFinishedOrders(t *testing.T) {
+	resetQueue(t, t.TempDir())
+	newQueueMock(t)
+
+	queueMu.Lock()
+	for i := 0; i < queueMaxEntries; i++ {
+		queueEntries = append(queueEntries, types.QueueEntry{
+			ID:      newQueueID(),
+			Status:  queueStatusDone,
+			Request: queuedRequest(),
+		})
+	}
+	queueMu.Unlock()
+
+	if _, err := QueueAdd(queuedRequest()); err != nil {
+		t.Fatalf("add to a queue of finished orders: %v", err)
+	}
+	if got := len(QueueList().Entries); got != queueMaxEntries+1 {
+		t.Fatalf("queue holds %d entries, want %d", got, queueMaxEntries+1)
+	}
+}
+
 // TestQueueFailsPermanently — waiting cannot fix a rejected payment, so the
 // order stops instead of polling until the end of time.
 func TestQueueFailsPermanently(t *testing.T) {

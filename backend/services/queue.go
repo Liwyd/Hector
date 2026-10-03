@@ -175,6 +175,13 @@ func QueueList() types.QueueView {
 	return types.QueueView{Entries: out, IntervalSeconds: secs, LastPollAt: queueLastPoll}
 }
 
+// queueActive reports whether an entry still occupies a place in the queue:
+// it is waiting to be built, or its create request is on the way. A built or
+// failed order is history — the log the panel shows, never a standing order.
+func queueActive(status string) bool {
+	return status == queueStatusWaiting || status == queueStatusCreating
+}
+
 // QueueAdd parks one out-of-stock order. Stock is read here so the caller
 // gets an answer instead of a queue entry that resolves a second later.
 func QueueAdd(req types.CreateRequest) (types.QueueEntry, error) {
@@ -202,15 +209,21 @@ func QueueAdd(req types.CreateRequest) (types.QueueEntry, error) {
 	queueMu.Lock()
 	defer queueMu.Unlock()
 
+	// One standing order per type and location: while an entry is still being
+	// polled, a second one would only race it. Built and failed entries are
+	// left in the log, but they hold nothing — otherwise the first success
+	// would lock that type out of the queue forever.
+	active := 0
 	for _, e := range queueEntries {
-		if e.Status == queueStatusFailed {
-			continue // a failed order may be replaced by a fresh one
+		if !queueActive(e.Status) {
+			continue
 		}
+		active++
 		if e.Request.ServerType == req.ServerType && e.Request.Location == req.Location {
 			return types.QueueEntry{}, ErrQueueDuplicate
 		}
 	}
-	if len(queueEntries) >= queueMaxEntries {
+	if active >= queueMaxEntries {
 		return types.QueueEntry{}, ErrQueueFull
 	}
 
