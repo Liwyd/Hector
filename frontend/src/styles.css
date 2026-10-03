@@ -127,6 +127,8 @@
   --move:#7AA7FF; --move-line:#263A5E;
   /* a picked out-of-stock type: the order-queue state */
   --queue-sel:#231D10; --queue-line:#6B5320;
+  /* the order queue's paper — one value for both themes, that page is its own room */
+  --queue-paper:#F6EAC2;
   --bar:#D2D1CC; --bar2:#767670;
   --scrim:rgba(0,0,0,.62); --scrim2:rgba(0,0,0,.66); --avg-line:rgba(216,217,213,.5);
 }
@@ -147,6 +149,29 @@ html[data-theme="light"]{
   --queue-sel:#FFF7E4; --queue-line:#E3C98A;
   --bar:#232320; --bar2:#9C9C94;
   --scrim:rgba(20,20,20,.4); --scrim2:rgba(20,20,20,.45); --avg-line:rgba(20,20,20,.4);
+}
+
+/* ---- paper: the order queue, and only the order queue ----
+   Set on <html> while that screen owns the room (see App.tsx). Every colour
+   is re-pointed here instead of in the screen, so the whole shell — bars,
+   rail, dialogs, toasts — arrives in ink-on-paper at once. Sits after both
+   theme blocks on purpose: this wins over the active theme. */
+html[data-paper]{
+  color-scheme:light;
+  --bg:var(--queue-paper); --card:#FFFDF5; --panel:#FDF7E6; --toast:#FFFEF8; --skel:#EADFBB;
+  --field:#FFFBEE; --btn:#FDF4DC;
+  --fg:#221E13; --t2:#514A32; --t3:#6F6749; --t4:#7E7650;
+  --line:#DFD2A4; --line2:#D3C592; --line3:#C5B67E; --line4:#B7A76C;
+  --line-row:#E7DCB2; --grid:#D9CC9A; --gridline:#EDE3BB;
+  --ctrl:#7C7355; --ctrl2:#98906D;
+  --accent:#C4291A; --accent-soft:#A81F12; --accent-dim:#FBE6E1; --accent-line:#EBB6AC; --danger:#B21C10;
+  --on-accent:#FFF7EE;
+  --warn:#8A6410; --warn-text:#6B4E0C; --warn-line:#DCC482;
+  --run:#0E7A45; --run-line:#A9D8BE;
+  --move:#2B5EC9; --move-line:#BAC9F0;
+  --queue-sel:#FFF4D0; --queue-line:#C9B26B;
+  --bar:#221E13; --bar2:#8B8359;
+  --scrim:rgba(40,34,12,.4); --scrim2:rgba(40,34,12,.45); --avg-line:rgba(34,30,19,.45);
 }
 
 /* ---- design system (ported byte-for-byte from the approved design) ---- */
@@ -286,3 +311,14 @@ button,.btn,.chip,.tab,.sw,.tile,.bkc,[style*="crosshair"]{user-select:none;-web
 .field-ta:focus-within{border-color:var(--ctrl)}
 .field-ta textarea{flex:1;background:transparent;border:0;outline:0;font-family:'Geist Mono',monospace;font-size:12.5px;line-height:1.5;resize:vertical;min-height:104px;color:var(--fg);padding:0}
 .field-ta textarea::placeholder{color:var(--t4)}
+
+/* ---- the order-queue wipe ----
+   One curtain, three states (App.tsx drives them). It rides over the page
+   while it wipes, then hides — by then <html data-paper> has already turned
+   the screen to paper in the same frame, so the colour swap can never be
+   caught half done. Leaving shows it again and runs the same wipe backwards. */
+.queue-wash{position:fixed;inset:0;z-index:40;pointer-events:none;background:var(--queue-paper);transform:scaleY(0);transform-origin:50% 100%;visibility:hidden;box-shadow:0 -26px 44px -26px rgba(58,46,14,.6)}
+.q-rise{visibility:visible;transform:scaleY(1);transition:transform .62s cubic-bezier(.22,1,.36,1)}
+.q-rest{visibility:hidden;transform:scaleY(1)}
+.q-fall{visibility:visible;transform:scaleY(0);transition:transform .58s cubic-bezier(.4,0,.75,.5)}
+@media (prefers-reduced-motion:reduce){.queue-wash{transition:none}}
