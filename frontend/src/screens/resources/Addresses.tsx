@@ -300,7 +300,7 @@ function PrimaryCreate({ close, mutate }: { close: () => void; mutate: Ctx<Prima
           ]}
         />
       </Field>
-      <Field label="Location">
+      <Field label="Location" hint="Where a free IP lives. Skip the choice below to set it — assigned IPs take their location from the server.">
         <Select
           value={loc}
           onChange={setLocation}

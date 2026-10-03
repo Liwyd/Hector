@@ -199,22 +199,43 @@ func PrimaryIP(ctx context.Context, id int64) (*types.PrimaryIP, error) {
 	return &out, nil
 }
 
-// PrimaryIPCreate allocates a primary IP.
-func PrimaryIPCreate(ctx context.Context, req types.PrimaryIPCreateRequest) (*types.PrimaryIP, *ActionResult, error) {
-	if req.Name == "" || req.Type == "" || req.Location == "" {
-		return nil, nil, fmt.Errorf("name, type and location are required")
+// primaryIPCreateBody validates a create request and builds the Hetzner
+// body. `location` and `assignee_id`/`assignee_type` are mutually exclusive
+// in the API: an unassigned IP must say where it lives, an assigned one
+// takes its location from the server it is handed to. Sending both is a
+// 422, so a "create and assign now" form must not post its location too.
+func primaryIPCreateBody(req types.PrimaryIPCreateRequest) (hetzner.PrimaryIPCreateRequest, error) {
+	var body hetzner.PrimaryIPCreateRequest
+	if req.Name == "" {
+		return body, fmt.Errorf("name is required")
 	}
 	if req.Type != "ipv4" && req.Type != "ipv6" {
-		return nil, nil, fmt.Errorf("%w: type must be ipv4 or ipv6", ErrBadField)
+		return body, fmt.Errorf("%w: type must be ipv4 or ipv6", ErrBadField)
 	}
-	body := hetzner.PrimaryIPCreateRequest{
-		Name:         req.Name,
-		Type:         req.Type,
-		Location:     locationSlug(req.Location),
-		AssigneeType: req.AssigneeType,
-		AssigneeID:   req.AssigneeID,
-		Labels:       req.Labels,
-		AutoDelete:   &req.AutoDelete,
+	if req.AssigneeID != nil && *req.AssigneeID > 0 {
+		body.AssigneeID = req.AssigneeID
+		body.AssigneeType = req.AssigneeType
+		if body.AssigneeType == "" {
+			body.AssigneeType = "server"
+		}
+	} else {
+		if req.Location == "" {
+			return body, fmt.Errorf("location is required unless the primary ip is assigned")
+		}
+		body.Location = locationSlug(req.Location)
+	}
+	body.Name = req.Name
+	body.Type = req.Type
+	body.Labels = req.Labels
+	body.AutoDelete = &req.AutoDelete
+	return body, nil
+}
+
+// PrimaryIPCreate allocates a primary IP.
+func PrimaryIPCreate(ctx context.Context, req types.PrimaryIPCreateRequest) (*types.PrimaryIP, *ActionResult, error) {
+	body, err := primaryIPCreateBody(req)
+	if err != nil {
+		return nil, nil, err
 	}
 	res, err := hcloud.PrimaryIPCreate(ctx, body)
 	if err != nil {
