@@ -1,31 +1,36 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { API, Firewalls, FloatingIPs, Networks } from '../../api'
+import { API, Firewalls, FloatingIPs, Networks, PrimaryIPs, waitForAction } from '../../api'
 import { copyText, useAsync } from '../../hooks'
 import { Ic } from '../../icons'
 import { Sec } from '../../components/ui'
 import { useToast } from '../../components/toast'
-import { Act, Field, Select, Sheet } from '../../components/resource'
+import { Act, Field, Select, Sheet, useServers } from '../../components/resource'
 import type { ActionResult, ServerDetail } from '../../types'
 
 /**
  * Network tab — everything this server is addressed by and filtered by:
- * public addresses, reverse DNS, floating IPs, private networks and the
- * firewalls applied to it. Attach and detach run from here too; the same
- * actions are available in the Addresses and Network sections.
+ * public addresses, reverse DNS, floating IPs, primary IPs, private
+ * networks and the firewalls applied to it. Attach, detach and move (to
+ * another server, running or stopped) all happen here; the same actions
+ * are available in the Addresses and Network sections.
  */
 export default function Network({ detail, desktop, onChanged }: { detail: ServerDetail; desktop?: boolean; onChanged: () => void }) {
   const toast = useToast()
   const px = desktop ? 28 : 16
   const [rev, setRev] = useState(0)
-  const [pane, setPane] = useState<'' | 'fip' | 'net'>('')
+  const [pane, setPane] = useState<'' | 'fip' | 'pip' | 'net'>('')
+  const [move, setMove] = useState<{ kind: 'fip' | 'primary'; id: number; ip: string } | null>(null)
 
   const fips = useAsync(() => FloatingIPs.list(), [rev])
+  const pips = useAsync(() => PrimaryIPs.list(), [rev])
   const nets = useAsync(() => Networks.list(), [rev])
   const fws = useAsync(() => Firewalls.list(), [rev])
 
   const mine = (fips.data ?? []).filter((f) => f.serverId === detail.id)
   const freeFips = (fips.data ?? []).filter((f) => f.serverId == null)
+  const minePips = (pips.data ?? []).filter((p) => p.assigneeType === 'server' && p.assigneeId === detail.id)
+  const freePips = (pips.data ?? []).filter((p) => p.assigneeId == null)
   const mineNets = (nets.data ?? []).filter((n) => n.servers.includes(detail.id))
   const freeNets = (nets.data ?? []).filter((n) => !n.servers.includes(detail.id))
   const mineFws = (fws.data ?? []).filter((f) => f.appliedTo.some((t) => t.type === 'server' && t.serverId === detail.id))
@@ -113,6 +118,7 @@ export default function Network({ detail, desktop, onChanged }: { detail: Server
             <Row key={f.id} last={i === mine.length - 1}>
               <span className="num" style={{ flex: 1, fontSize: 14 }}>{f.ip}</span>
               <span className="tag">{f.type}</span>
+              <SmallAct onClick={() => setMove({ kind: 'fip', id: f.id, ip: f.ip })}>Move</SmallAct>
               <SmallAct onClick={() => void run(`Detach ${f.ip}`, FloatingIPs.act(f.id, 'unassign', {}))}>
                 Detach
               </SmallAct>
@@ -129,13 +135,45 @@ export default function Network({ detail, desktop, onChanged }: { detail: Server
           )}
         </div>
         <p className="m t3" style={{ fontSize: 10.5, margin: '10px 0 0', lineHeight: 1.6 }}>
-          A FLOATING IP MOVES BETWEEN SERVERS WITHOUT CHANGING DNS.
+          A FLOATING IP MOVES BETWEEN SERVERS WITHOUT CHANGING DNS — STOPPED OR RUNNING, EITHER ONE.
         </p>
       </section>
 
       <section style={{ padding: `28px ${px}px 0` }}>
         <Sec
           n="04"
+          title="Primary IPs"
+          right={<SmallAct onClick={() => setPane('pip')}>Attach</SmallAct>}
+        />
+        <div className="card">
+          {minePips.map((p, i) => (
+            <Row key={p.id} last={i === minePips.length - 1}>
+              <span className="num" style={{ flex: 1, fontSize: 14 }}>{p.ip}</span>
+              <span className="tag">{p.type}</span>
+              <SmallAct onClick={() => setMove({ kind: 'primary', id: p.id, ip: p.ip })}>Move</SmallAct>
+              <SmallAct onClick={() => void run(`Detach ${p.ip}`, PrimaryIPs.act(p.id, 'unassign', {}))}>
+                Detach
+              </SmallAct>
+            </Row>
+          ))}
+          {minePips.length === 0 && (
+            <p className="m t3" style={{ fontSize: 11, padding: 14, margin: 0 }}>
+              {pips.error
+                ? 'Could not read the primary IP list.'
+                : freePips.length
+                  ? `${freePips.length} unassigned primary IP(s) ready to attach.`
+                  : 'No primary IP on this server.'}
+            </p>
+          )}
+        </div>
+        <p className="m t3" style={{ fontSize: 10.5, margin: '10px 0 0', lineHeight: 1.6 }}>
+          PRIMARY IPS STAY WITH THE PROJECT. THEY ONLY MOVE BETWEEN SERVERS IN THE SAME LOCATION.
+        </p>
+      </section>
+
+      <section style={{ padding: `28px ${px}px 0` }}>
+        <Sec
+          n="05"
           title="Private networks"
           right={<SmallAct onClick={() => setPane('net')}>Attach</SmallAct>}
         />
@@ -170,7 +208,7 @@ export default function Network({ detail, desktop, onChanged }: { detail: Server
 
       <section style={{ padding: `28px ${px}px 40px` }}>
         <Sec
-          n="05"
+          n="06"
           title="Firewalls"
           right={
             <Link className="btn btn-line" style={{ height: 30, padding: '0 12px', fontSize: 11, letterSpacing: '.1em' }} to="/network/firewalls">
@@ -233,7 +271,117 @@ export default function Network({ detail, desktop, onChanged }: { detail: Server
           )}
         </Sheet>
       )}
+      {pane === 'pip' && (
+        <Sheet open onClose={() => setPane('')} eyebrow="Addresses" title="Attach primary IP" sub={detail.name}>
+          {freePips.length === 0 ? (
+            <p className="m t3" style={{ fontSize: 12, margin: 0, lineHeight: 1.7 }}>
+              No unassigned primary IP in the project. Create one in Addresses and it will show up here.
+            </p>
+          ) : (
+            <AttachSelect
+              label="Primary IP"
+              hint="Only unassigned addresses are listed, and they have to sit in this server's location."
+              options={freePips.map((p) => ({ value: String(p.id), label: `${p.ip}${p.name ? ` · ${p.name}` : ''}` }))}
+              onClose={() => setPane('')}
+              onSubmit={(v) =>
+                run(
+                  'Attach primary IP',
+                  PrimaryIPs.act(Number(v), 'assign', {
+                    serverId: detail.id,
+                    assigneeId: detail.id,
+                    assigneeType: 'server',
+                  }),
+                )
+              }
+            />
+          )}
+        </Sheet>
+      )}
+
+      {move && (
+        <MoveSheet
+          kind={move.kind}
+          id={move.id}
+          ip={move.ip}
+          from={detail.id}
+          onClose={() => setMove(null)}
+          onMoved={refresh}
+        />
+      )}
     </>
+  )
+}
+
+/** Detach an address and attach it to a different server in one go. The two
+ *  Hetzner actions cannot overlap: an assign is rejected while the unassign
+ *  is still running, so the first one is awaited to completion. Works from a
+ *  stopped server just as well as a running one. */
+function MoveSheet({
+  kind,
+  id,
+  ip,
+  from,
+  onClose,
+  onMoved,
+}: {
+  kind: 'fip' | 'primary'
+  id: number
+  ip: string
+  from: number
+  onClose: () => void
+  onMoved: () => void
+}) {
+  const toast = useToast()
+  const { servers } = useServers()
+  const [pick, setPick] = useState('')
+  const [busy, setBusy] = useState(false)
+  const targets = servers.filter((s) => s.id !== from)
+  const act = kind === 'fip' ? FloatingIPs.act : PrimaryIPs.act
+
+  const move = async () => {
+    if (!pick || busy) return
+    const target = Number(pick)
+    setBusy(true)
+    try {
+      const off = await act(id, 'unassign', {})
+      if (!(await waitForAction(off.action.id))) {
+        toast.push({ kind: 'error', title: `Could not detach ${ip}`, detail: 'The unassign action never finished.' })
+        return
+      }
+      const on = await act(id, 'assign', {
+        serverId: target,
+        assigneeId: target,
+        assigneeType: 'server',
+      })
+      toast.trackAction(`Moving ${ip}`, on.action, onMoved)
+      onClose()
+    } catch (err) {
+      toast.push({ kind: 'error', title: `Move ${ip} failed`, detail: err instanceof Error ? err.message : 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Sheet open onClose={onClose} eyebrow="Address" title="Move to another server" sub={ip}>
+      <Field label="New server" hint="Detached from this server first, then attached to the new one — running or stopped, both work.">
+        <Select
+          value={pick}
+          onChange={setPick}
+          disabled={busy}
+          options={[
+            { value: '', label: targets.length ? 'Pick a server…' : 'This is the only server in the project' },
+            ...targets.map((s) => ({ value: String(s.id), label: `${s.name} · ${s.status}` })),
+          ]}
+        />
+      </Field>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Act tone="primary" disabled={!pick || busy} onClick={() => void move()}>
+          {busy ? 'Moving…' : 'Move'}
+        </Act>
+        <Act onClick={onClose}>Cancel</Act>
+      </div>
+    </Sheet>
   )
 }
 

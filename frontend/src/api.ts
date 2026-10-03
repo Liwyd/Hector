@@ -54,6 +54,18 @@ export function notifyResource(prefix: string) {
   window.dispatchEvent(new Event('hector:changed'))
 }
 
+/** Block until a Hetzner action settles. Two actions that depend on each
+ *  other (unassign, then assign) cannot be issued back to back — the second
+ *  one is rejected while the first is still running. */
+export async function waitForAction(id: number): Promise<boolean> {
+  for (let i = 0; i < 40; i++) {
+    const a = await API.actionGet(id).catch(() => null)
+    if (a && a.status !== 'running') return a.status === 'success'
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+  return false
+}
+
 /** true once after notifyChanged(): the next fleet read must bypass the
  *  backend's 25 s cache too. */
 export function takeFleetDirty(): boolean {
