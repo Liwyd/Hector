@@ -29,7 +29,12 @@ export default function Network({ detail, desktop, onChanged }: { detail: Server
 
   const mine = (fips.data ?? []).filter((f) => f.serverId === detail.id)
   const freeFips = (fips.data ?? []).filter((f) => f.serverId == null)
-  const minePips = (pips.data ?? []).filter((p) => p.assigneeType === 'server' && p.assigneeId === detail.id)
+  // Matched on the assignee and on the address itself: the addresses this
+  // server is actually carrying are the ones it should list, whatever the
+  // assignee metadata says.
+  const minePips = (pips.data ?? []).filter(
+    (p) => (p.assigneeType === 'server' && p.assigneeId === detail.id) || p.ip === detail.ipv4 || p.ip === detail.ipv6,
+  )
   const freePips = (pips.data ?? []).filter((p) => p.assigneeId == null)
   const mineNets = (nets.data ?? []).filter((n) => n.servers.includes(detail.id))
   const freeNets = (nets.data ?? []).filter((n) => !n.servers.includes(detail.id))
