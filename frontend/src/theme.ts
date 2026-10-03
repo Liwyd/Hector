@@ -16,7 +16,7 @@ export function applyTheme(theme: Theme) {
   if (theme === 'light') root.dataset.theme = 'light'
   else delete root.dataset.theme
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', theme === 'light' ? '#F7F6F3' : '#0A0A0A')
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#F7F6F3' : '#151617')
 }
 
 export function toggleTheme(): Theme {
