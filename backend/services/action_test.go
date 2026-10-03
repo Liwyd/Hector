@@ -180,6 +180,17 @@ func TestNetworkPayloadUsesSnakeCase(t *testing.T) {
 	if len(got) != 1 || got["ip_range"] != "10.0.1.0/24" {
 		t.Errorf("delete_subnet body = %v", got)
 	}
+
+	// attaching and detaching a server send the same field in both directions
+	for _, name := range []string{"add_server", "remove_server"} {
+		got = marshal(t, mustNetworkPayload(t, name, map[string]any{"serverId": 5}))
+		if len(got) != 1 || got["server_id"] != float64(5) {
+			t.Errorf("%s body = %v, want {server_id: 5}", name, got)
+		}
+		if _, err := networkPayload(name, map[string]any{}); !errors.Is(err, ErrBadField) {
+			t.Errorf("%s without serverId = %v, want ErrBadField", name, err)
+		}
+	}
 }
 
 func mustNetworkPayload(t *testing.T, name string, body map[string]any) any {

@@ -232,6 +232,15 @@ func networkPayload(name string, body map[string]any) (any, error) {
 			Delete bool `json:"delete"`
 		}{Delete: protect}, nil
 
+	case "add_server", "remove_server":
+		serverID, err := fieldInt64(body, "serverId", true)
+		if err != nil {
+			return nil, err
+		}
+		return struct {
+			ServerID int64 `json:"server_id"`
+		}{ServerID: serverID}, nil
+
 	default:
 		return nil, ErrActionNotAllowed
 	}

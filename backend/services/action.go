@@ -28,6 +28,8 @@ var managedActions = map[string]map[string]bool{
 		"delete_route":      true,
 		"change_ip_range":   true,
 		"change_protection": true,
+		"add_server":        true,
+		"remove_server":     true,
 	},
 	"firewalls": {
 		"set_rules":             true,
