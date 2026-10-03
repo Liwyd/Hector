@@ -278,7 +278,7 @@ func PrimaryIPAction(ctx context.Context, id int64, name string, body map[string
 func ipActionPayload(name string, body map[string]any, assigneeKey string) (any, error) {
 	switch name {
 	case "assign":
-		id, err := fieldInt64(body, assigneeKey, true)
+		id, err := fieldInt64First(body, true, assigneeKey, assigneeKey+"Id")
 		if err != nil {
 			return nil, err
 		}

@@ -140,6 +140,26 @@ func fieldInt64(body map[string]any, key string, required bool) (int64, error) {
 		}
 		return 0, nil
 	}
+	return int64Field(raw, key)
+}
+
+// fieldInt64First reads whichever of the given keys the caller actually
+// sent. The panel posts camelCase (serverId, assigneeId) everywhere while
+// Hetzner documents the wire names (server, assignee) — one handler takes
+// both so an assign never fails over a spelling.
+func fieldInt64First(body map[string]any, required bool, keys ...string) (int64, error) {
+	for _, key := range keys {
+		if raw, ok := body[key]; ok && raw != nil {
+			return int64Field(raw, key)
+		}
+	}
+	if !required {
+		return 0, nil
+	}
+	return 0, fmt.Errorf("%w: %s is required", ErrBadField, keys[0])
+}
+
+func int64Field(raw any, key string) (int64, error) {
 	switch v := raw.(type) {
 	case float64:
 		return int64(v), nil

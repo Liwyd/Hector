@@ -215,6 +215,16 @@ func TestIPAddressPayloads(t *testing.T) {
 		t.Errorf("primary assign = %v", got)
 	}
 
+	// the panel posts camelCase — both spellings reach the same wire body
+	got = marshal(t, mustIPPayload(t, "assign", map[string]any{"serverId": 5}, "server"))
+	if got["server"] != float64(5) {
+		t.Errorf("floating assign via serverId = %v", got)
+	}
+	got = marshal(t, mustIPPayload(t, "assign", map[string]any{"assigneeId": 5, "assigneeType": "server"}, "assignee"))
+	if got["assignee_id"] != float64(5) || got["assignee_type"] != "server" {
+		t.Errorf("primary assign via assigneeId = %v", got)
+	}
+
 	// clearing rDNS sends an explicit null, not ""
 	got = marshal(t, mustIPPayload(t, "change_dns_ptr", map[string]any{"ip": "1.2.3.4"}, "server"))
 	if v, present := got["dns_ptr"]; !present || v != nil {
