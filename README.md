@@ -40,7 +40,7 @@ examples use the name `mypanel` — pick any name you like.
 <summary><b>1 · Install the script</b> — one time per server</summary>
 
 ```sh
-sudo bash -c "$(curl -sL https://raw.githubusercontent.com/ErfJabs/Hector/master/install.sh)" @ script-install
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/Liwyd/Hector/master/install.sh)" @ script-install
 ```
 
 Downloads the `hector` command to `/usr/local/bin`. From then on you can type
@@ -56,7 +56,7 @@ hector install mypanel master
 
 This will:
 
-1. create `/opt/erfjab/hector/mypanel`,
+1. create `/opt/hector/mypanel`,
 2. download the newest build for your server's CPU,
 3. create a fresh `.env` and open it in **nano** — put your `HCLOUD_TOKEN`
    in it (create one in the Hetzner console → Security → API tokens, with
@@ -164,7 +164,7 @@ changes apply.
 hector remove mypanel
 ```
 
-Stops and disables the service and deletes `/opt/erfjab/hector/mypanel`
+Stops and disables the service and deletes `/opt/hector/mypanel`
 including its `.env`. This cannot be undone.
 </details>
 
@@ -187,6 +187,53 @@ hector help
 ```
 </details>
 
+## Run from source
+
+Everything needed to build and run the panel is in this repository — clone it,
+build it, run it. No other project, account or service is involved.
+
+Requirements: Go 1.26+ and Node 20.19+ (or 22.12+).
+
+```sh
+git clone https://github.com/Liwyd/Hector.git
+cd Hector
+cp .env.example .env   # fill in HCLOUD_TOKEN and ADMIN_PASSWORD
+make run               # builds the React app, embeds it, starts the panel
+```
+
+Sign in at `http://localhost:8787` with `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+
+Other targets:
+
+```sh
+make build         # single binary with the frontend embedded
+make dev           # backend only (go run .) — rerun after Go changes
+make frontend-dev  # Vite dev server, /api proxied to :8787
+make vet           # go vet ./...
+make test          # go test ./...
+make release       # cross-compiled Linux binaries in dist/
+make clean
+```
+
+## Configuration
+
+`.env` is optional — every variable below can also be exported in the
+environment, and a real environment variable always wins over the file.
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `HCLOUD_TOKEN` | **yes** | Hetzner Cloud API token, read + write (Hetzner console → Security → API tokens) |
+| `ADMIN_PASSWORD` | **yes** | password of the single admin account |
+| `ADMIN_USERNAME` | no | defaults to `admin` |
+| `JWT_SECRET` | no | session signing key; when empty a random one is generated at boot, which logs everyone out on every restart |
+| `API_HOST` | no | bind address, defaults to `0.0.0.0` |
+| `API_PORT` | no | defaults to `8787` |
+| `PROXY_URL` | no | SOCKS5 or HTTP proxy for **all** `api.hetzner.cloud` traffic (`socks5://user:pass@host:port`, `http://…`, or bare `host:port`; `SOCKS_PROXY` works as an alias) |
+| `HCLOUD_API_URL` | no | API base override — development against a local mock only |
+
+There is no database: every value the panel shows comes live from the Hetzner
+Cloud API, optionally through the proxy above.
+
 ## Development
 
 ```sh
@@ -203,7 +250,10 @@ without a test fails the suite. Layering is strict: `backend/hetzner`
 (client) → `backend/services` (cache + business rules) → `handlers` →
 `routes` → React. There is no database.
 
-## Community
+## About this fork
 
-Telegram channel: [@erfjabs](https://t.me/erfjabs)
+Standalone build, maintained independently of the original project. It runs on
+its own releases, its own installer and its own instance directory
+(`/opt/hector`); nothing is fetched from the upstream repository. Source and
+issues: [Liwyd/Hector](https://github.com/Liwyd/Hector).
 

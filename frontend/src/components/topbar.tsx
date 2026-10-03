@@ -39,16 +39,6 @@ export function TopBar({
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: desktop ? 4 : 0 }}>
-        <a
-          className="btn btn-ico btn-bare"
-          href="https://t.me/erfjabs"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Telegram channel"
-          title="Telegram · @erfjabs"
-        >
-          <Ic.Telegram />
-        </a>
         <ThemeToggle />
         {showRefresh && (
           <button className="btn btn-ico btn-bare" aria-label="Refresh" onClick={onRefresh} type="button">

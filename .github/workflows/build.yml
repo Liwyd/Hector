@@ -81,7 +81,7 @@ jobs:
 
             Install via:
             ```bash
-            sudo bash -c "$(curl -sL https://raw.githubusercontent.com/ErfJabs/Hector/master/install.sh)" @ script-install
+            sudo bash -c "$(curl -sL https://raw.githubusercontent.com/Liwyd/Hector/master/install.sh)" @ script-install
             hector install <name> ${{ github.ref_name }}
             ```
           files: |

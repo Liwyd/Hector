@@ -105,14 +105,14 @@ export default function SignIn() {
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
         <a
-          href="https://t.me/erfjabs"
+          href="https://github.com/Liwyd/Hector"
           target="_blank"
           rel="noreferrer"
           className="src"
           style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
-          <Ic.Telegram />
-          @erfjabs
+          <Ic.Globe />
+          Liwyd/Hector
         </a>
       </form>
     </div>
