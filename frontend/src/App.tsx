@@ -22,17 +22,18 @@ import ActivityScreen from './screens/resources/Activity'
 /** Every new section is one route here and one SECTIONS entry in section.tsx. */
 const guarded = (el: React.ReactNode) => <RequireAuth>{el}</RequireAuth>
 
-/** The order queue is the one screen that changes the room: a pale yellow
- *  curtain wipes up over it, and the colours swap to paper underneath the
- *  curtain. Leaving runs the same wipe backwards. `idle` is off screen,
- *  `rise` / `fall` are moving, `rest` is up and the page already owns it. */
+/** The order queue is the one screen with its own light: a translucent yellow
+ *  rises behind the page — never over it — and drains back the way it came.
+ *  `idle` is off screen, `rise` / `fall` are moving, `rest` is up and the
+ *  screen owns the room. The page hands over its background for exactly as
+ *  long as the light is on (html[data-queue], see styles.css). */
 type Wash = 'idle' | 'rise' | 'rest' | 'fall'
 const isQueuePath = (p: string) => p === '/queue' || p.startsWith('/queue/')
-const RISE_MS = 640 // matches the .62s wipe, plus a frame of slack
-const FALL_MS = 600 // matches the .58s wipe
+const RISE_MS = 700 // the .66s wipe, plus a frame of slack
+const FALL_MS = 660 // the .6s wipe — never cut it short: going idle paints the page again
 const noWipe = () =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-/** where the wipe goes next: up over a screen that is opening, down off one
+/** where the light goes next: up into a screen that is opening, down off one
  *  that is closing, nowhere if motion is off or nothing is on screen */
 const nextWash = (opening: boolean, from: Wash): Wash =>
   noWipe() ? (opening ? 'rest' : 'idle') : opening ? 'rise' : from === 'idle' ? 'idle' : 'fall'
@@ -51,27 +52,27 @@ export default function App() {
 
   // Flipping the wipe during render (not in an effect) puts the new route and
   // the new wipe in one commit: no frame is ever painted with the new screen
-  // in the old screen's colours. The layout effect below then lands the paper
-  // swap before the browser paints.
+  // still lit the old way. The layout effect below hands the page background
+  // over before the browser paints.
   if (queue !== was) {
     setWas(queue)
     setWash(nextWash(queue, wash))
   }
 
-  // The paper swap has to land in the same paint as the curtain hiding, or the
-  // page is caught mid-switch — a layout effect, so it runs before the paint.
+  // The page stops painting its own field exactly while the light is moving or
+  // held — a layout effect, so the handover lands in the same paint.
   useLayoutEffect(() => {
-    document.documentElement.toggleAttribute('data-paper', wash === 'rest')
+    document.documentElement.toggleAttribute('data-queue', wash !== 'idle')
   }, [wash])
 
   // Opening straight on /queue (reload, deep link) still gets the wipe: the
-  // first frame is the screen as it was, then the curtain goes up over it.
+  // first frame is the screen as it was, then the light goes up behind it.
   useEffect(() => {
     if (queue && wash === 'idle') setWash(noWipe() ? 'rest' : 'rise')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Each moving wipe ends on its own: up → paper, down → out of the way.
+  // Each moving wipe ends on its own: up → held, down → out of the way.
   useEffect(() => {
     if (wash !== 'rise' && wash !== 'fall') return
     const t = window.setTimeout(() => setWash(wash === 'rise' ? 'rest' : 'idle'), wash === 'rise' ? RISE_MS : FALL_MS)
