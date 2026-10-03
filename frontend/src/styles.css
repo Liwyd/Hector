@@ -125,6 +125,8 @@
   --warn:#F5B83D; --warn-text:#E8D6AE; --warn-line:#5C4718;
   --run:#3DDB8B; --run-line:#1E4A34;
   --move:#7AA7FF; --move-line:#263A5E;
+  /* a picked out-of-stock type: the order-queue state */
+  --queue-sel:#231D10; --queue-line:#6B5320;
   --bar:#D2D1CC; --bar2:#767670;
   --scrim:rgba(0,0,0,.62); --scrim2:rgba(0,0,0,.66); --avg-line:rgba(216,217,213,.5);
 }
@@ -141,6 +143,8 @@ html[data-theme="light"]{
   --warn:#B57E14; --warn-text:#7A5A12; --warn-line:#E7D3A3;
   --run:#12A150; --run-line:#B7E6CC;
   --move:#2F6FEB; --move-line:#C3D3F5;
+  /* a picked out-of-stock type: the order-queue state */
+  --queue-sel:#FFF7E4; --queue-line:#E3C98A;
   --bar:#232320; --bar2:#9C9C94;
   --scrim:rgba(20,20,20,.4); --scrim2:rgba(20,20,20,.45); --avg-line:rgba(20,20,20,.4);
 }

@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useIsDesktop } from '../hooks'
 
-/** The panel's nine sections, in four groups. `path` doubles as the route in
+/** The panel's ten sections, in four groups. `path` doubles as the route in
  *  App.tsx so navigation and routing can never drift apart. */
 export interface SectionDef {
   group: string
@@ -20,6 +20,7 @@ export const SECTIONS: SectionDef[] = [
     path: '/',
     match: (p) => p === '/' || p.startsWith('/servers') || p === '/new',
   },
+  { group: 'Compute', label: 'Queue', path: '/queue', match: prefix('/queue') },
   { group: 'Compute', label: 'Storage', path: '/storage', match: prefix('/storage') },
   { group: 'Compute', label: 'Images', path: '/images', match: prefix('/images') },
   { group: 'Network', label: 'Network', path: '/network', match: prefix('/network') },

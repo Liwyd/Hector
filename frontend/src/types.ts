@@ -187,6 +187,28 @@ export interface CreateResult {
   rootPassword: string
 }
 
+/** One out-of-stock order: the confirmed create payload, parked until Hetzner
+ *  sells the type again. `rootPassword` only exists once the build happened. */
+export interface QueueEntry {
+  id: string
+  createdAt: string
+  status: 'waiting' | 'creating' | 'done' | 'failed'
+  request: CreateRequest
+  attempts: number
+  lastCheckAt?: string
+  nextCheckAt?: string
+  lastError?: string
+  serverId?: number
+  serverName?: string
+  rootPassword?: string
+}
+
+export interface QueueView {
+  entries: QueueEntry[]
+  intervalSeconds: number
+  lastPollAt?: string
+}
+
 export interface JobStep {
   key: string
   status: string

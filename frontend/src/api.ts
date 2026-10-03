@@ -1,7 +1,7 @@
 import type {
   Activity, ActionResult, Certificate, Catalog, CreateRequest, CreateResult, Fleet, FloatingIP,
-  Firewall, Image, Job, LoadBalancer, MetricsView, Network, PlacementGroup, PrimaryIP, ServerDetail,
-  SSHKey, Volume,
+  Firewall, Image, Job, LoadBalancer, MetricsView, Network, PlacementGroup, PrimaryIP, QueueEntry,
+  QueueView, ServerDetail, SSHKey, Volume,
 } from './types'
 
 const TOKEN_KEY = 'hector.token'
@@ -161,6 +161,15 @@ export const API = {
       sshKeys: c.sshKeys ?? [],
       isos: c.isos ?? [],
     })),
+
+  // the out-of-stock order queue — the one thing the panel stores itself
+  queue: {
+    list: () => api<QueueView>('GET', '/api/order-queue'),
+    add: (req: CreateRequest) => api<QueueEntry>('POST', '/api/order-queue', req),
+    remove: (id: string) => api<void>('DELETE', `/api/order-queue/${id}`),
+    check: () => api<QueueView>('POST', '/api/order-queue/check'),
+    forget: (id: string) => api<void>('POST', `/api/order-queue/${id}/forget`),
+  },
 
   server: (id: number) => api<ServerDetail>('GET', `/api/servers/${id}`),
   rename: (id: number, name: string) => api<ServerDetail>('PUT', `/api/servers/${id}`, { name }),

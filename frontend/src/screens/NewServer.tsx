@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { API, CATALOG_CACHE, notifyChanged } from '../api'
+import { API, ApiError, CATALOG_CACHE, notifyChanged } from '../api'
 import { useAsync, useIsDesktop } from '../hooks'
 import { Ic } from '../icons'
 import { Sw } from '../components/ui'
@@ -8,7 +8,7 @@ import { useToast } from '../components/toast'
 import { ErrorPanel } from '../components/states'
 import { euro, randomServerName, tierOf, toServerName, validServerName, type Tier } from '../format'
 import { ImagePicker, defaultImage, imageRef, type Img } from '../components/images'
-import type { Catalog, CatalogServerType } from '../types'
+import type { Catalog, CatalogServerType, CreateRequest } from '../types'
 
 
 const shortFp = (fp: string) => {
@@ -72,7 +72,15 @@ export default function NewServer() {
 
   // never default to (or keep) a type that isn't sold in the chosen location
   const sellable = (t: CatalogServerType) => !!t.prices[locCodeName]?.available
-  const selectedType = typeOptions.find((t) => t.name === typeName && sellable(t)) ?? typeOptions.find(sellable)
+  // priced here but sold out: the type the order queue exists for
+  const offered = (t: CatalogServerType) => !!t.prices[locCodeName]
+  const picked = typeOptions.find((t) => t.name === typeName)
+  // a type that exists here stays selected even when it is out of stock, so
+  // its row can be picked and ordered; everything else falls back to a type
+  // that can actually be built now
+  const selectedType = (picked && offered(picked) ? picked : undefined) ?? typeOptions.find(sellable)
+  // out of stock: this order is queued instead of built
+  const queueMode = !!selectedType && !sellable(selectedType)
   const price = selectedType?.prices[locCodeName]?.monthly ?? 0
   const hourly = selectedType?.prices[locCodeName]?.hourly ?? 0
   const backupPct = Number(catalog?.backupPercent ?? '20')
@@ -108,20 +116,28 @@ export default function NewServer() {
 
   const create = async () => {
     if (!ready || !selectedType || !effectiveImage || !location) return
+    const payload: CreateRequest = {
+      name: cleanedName,
+      type: selectedType.name,
+      image: imageRef(effectiveImage),
+      location: location.name,
+      sshKeys,
+      userData,
+      startAfterCreate: startAfter,
+      backups,
+      enableIpv4,
+      enableIpv6,
+    }
     setBusy(true)
     try {
-      const result = await API.create({
-        name: cleanedName,
-        type: selectedType.name,
-        image: imageRef(effectiveImage),
-        location: location.name,
-        sshKeys,
-        userData,
-        startAfterCreate: startAfter,
-        backups,
-        enableIpv4,
-        enableIpv6,
-      })
+      // out of stock: hand the confirmed build to the queue instead of Hetzner
+      if (queueMode) {
+        await API.queue.add(payload)
+        toast.push({ kind: 'success', title: `${cleanedName} queued`, detail: 'Hector builds it as soon as stock returns.' })
+        navigate('/queue')
+        return
+      }
+      const result = await API.create(payload)
       toast.trackAction(`Building ${cleanedName}`, result.action)
       notifyChanged()
       navigate(`/servers/${result.server.id}/created`, {
@@ -132,7 +148,17 @@ export default function NewServer() {
         },
       })
     } catch (err) {
-      toast.push({ kind: 'error', title: 'Create failed', detail: err instanceof Error ? err.message : 'error' })
+      const code = err instanceof ApiError ? err.code : ''
+      const title = queueMode ? 'Could not queue the order' : 'Create failed'
+      let detail = err instanceof Error ? err.message : 'error'
+      if (code === 'queue_available') {
+        // stock arrived between the catalog read and the click
+        detail = 'It is in stock now — create it right away.'
+        catalogSt.reload(true)
+      } else if (code === 'queue_duplicate') {
+        detail = 'That order is already waiting in the queue.'
+      }
+      toast.push({ kind: 'error', title, detail })
       setBusy(false)
     }
   }
@@ -436,7 +462,7 @@ export default function NewServer() {
             <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column' }}>
               <SheetRow k="Location" v={`${locCodeName} · ${location.city}`} />
               <SheetRow k="Image" v={effectiveImage?.description ?? '—'} />
-              <SheetRow k="Type" v={selectedType ? `${selectedType.name.toUpperCase()} · ${selectedType.cores} / ${Math.round(selectedType.memoryGb)} GB / ${selectedType.diskGb} GB` : '—'} />
+              <SheetRow k="Type" v={selectedType ? `${selectedType.name.toUpperCase()} · ${selectedType.cores} / ${Math.round(selectedType.memoryGb)} GB / ${selectedType.diskGb} GB${queueMode ? ' · OUT OF STOCK' : ''}` : '—'} />
             </div>
             {/* networking has no section in the desktop form — the toggles live here */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line-row)' }}>
@@ -494,14 +520,19 @@ export default function NewServer() {
                 {missing.toUpperCase()}
               </div>
             )}
+            {!missing && queueMode && (
+              <div className="m" style={{ fontSize: 10.5, letterSpacing: '.06em', marginTop: 14, color: 'var(--warn)', lineHeight: 1.6 }}>
+                OUT OF STOCK HERE — JOIN THE QUEUE, HECTOR BUILDS IT THE MOMENT IT RETURNS
+              </div>
+            )}
             <button
               type="button"
               className={ready ? 'btn btn-red' : 'btn btn-red btn-dis'}
-              style={{ width: '100%', height: 52, marginTop: missing ? 8 : 18, fontSize: 13 }}
+              style={{ width: '100%', height: 52, marginTop: missing || queueMode ? 8 : 18, fontSize: 13 }}
               disabled={!ready}
               onClick={create}
             >
-              {busy ? 'Creating…' : 'Create server'}
+              {busy ? (queueMode ? 'Queuing…' : 'Creating…') : queueMode ? 'Add to queue' : 'Create server'}
             </button>
           </div>
         </div>
@@ -586,8 +617,19 @@ export default function NewServer() {
 
       <div className="dock" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 520, bottom: 0, padding: '14px 16px 24px', background: 'var(--bg)', borderTop: '1px solid var(--line)', zIndex: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
-          <span className="m" style={{ fontSize: 11, letterSpacing: '.08em', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: missing ? 'var(--accent-soft)' : 'var(--t2)' }}>
-            {missing ? missing.toUpperCase() : summary}
+          <span
+            className="m"
+            style={{
+              fontSize: 11,
+              letterSpacing: '.08em',
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: missing ? 'var(--accent-soft)' : queueMode ? 'var(--warn)' : 'var(--t2)',
+            }}
+          >
+            {missing ? missing.toUpperCase() : queueMode ? 'OUT OF STOCK · JOIN THE QUEUE' : summary}
           </span>
           <span className="num" style={{ fontSize: 18, flex: 'none' }}>
             {euro(price)}
@@ -595,7 +637,7 @@ export default function NewServer() {
           </span>
         </div>
         <button type="button" className={ready ? 'btn btn-red' : 'btn btn-red btn-dis'} style={{ width: '100%', height: 54, fontSize: 13 }} disabled={!ready} onClick={create}>
-          {busy ? 'Creating…' : 'Create server'}
+          {busy ? (queueMode ? 'Queuing…' : 'Creating…') : queueMode ? 'Add to queue' : 'Create server'}
         </button>
       </div>
     </div>
@@ -638,15 +680,34 @@ function TypeRow({
   onPick: () => void
 }) {
   const price = t.prices[locCode]
-  const available = price?.available ?? false
+  // not priced here at all: the type simply does not exist in this location
+  const offered = !!price
+  const available = !!price?.available
+  // picked to be ordered instead of built — the order-queue state
+  const queued = on && offered && !available
+  const status = available ? '' : offered ? 'Out of stock' : 'Not in this location'
+  const edge = on ? (queued ? 'var(--queue-line)' : 'var(--accent)') : 'transparent'
+  const chrome = {
+    border: `1px solid ${edge}`,
+    borderBottom: `1px solid ${on ? edge : 'var(--line)'}`,
+    background: queued ? 'var(--queue-sel)' : undefined,
+    opacity: available || queued ? 1 : 0.4,
+  }
+  const dot = {
+    width: 12,
+    height: 12,
+    background: on ? (queued ? 'var(--warn)' : 'var(--accent)') : undefined,
+    boxShadow: on ? undefined : 'inset 0 0 0 1.5px var(--ctrl2)',
+  }
 
   if (desktop) {
     return (
       <button
         role="radio"
         aria-checked={on}
-        disabled={!available}
+        disabled={!offered}
         onClick={onPick}
+        title={offered ? undefined : 'This type is not sold in this location'}
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 80px 80px 90px 110px 100px',
@@ -654,20 +715,26 @@ function TypeRow({
           width: '100%',
           height: 52,
           padding: '0 12px',
-          border: `1px solid ${on ? 'var(--accent)' : 'transparent'}`,
-          borderBottom: `1px solid ${on ? 'var(--accent)' : 'var(--line)'}`,
-          opacity: available ? 1 : 0.4,
+          ...chrome,
         }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 12, height: 12, background: on ? 'var(--accent)' : undefined, boxShadow: on ? undefined : 'inset 0 0 0 1.5px var(--ctrl2)' }} />
+          <span style={dot} />
           <span className="num" style={{ fontSize: 15 }}>{t.name.toUpperCase()}</span>
         </span>
         <span className="num" style={{ fontSize: 13, textAlign: 'right' }}>{t.cores}</span>
         <span className="num" style={{ fontSize: 13, textAlign: 'right' }}>{Math.round(t.memoryGb)} GB</span>
         <span className="num" style={{ fontSize: 13, textAlign: 'right' }}>{t.diskGb} GB</span>
-        <span className="num t3" style={{ fontSize: 12, textAlign: 'right' }}>{available ? euro(price.hourly, 4) : '—'}</span>
-        <span className="num" style={{ fontSize: 14, textAlign: 'right' }}>{available ? euro(price.monthly) : <span className="t3">Unavailable</span>}</span>
+        <span className="num t3" style={{ fontSize: 12, textAlign: 'right' }}>{available && price ? euro(price.hourly, 4) : '—'}</span>
+        <span className="num" style={{ fontSize: 14, textAlign: 'right' }}>
+          {available && price ? (
+            euro(price.monthly)
+          ) : (
+            <span style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: queued ? 'var(--warn)' : 'var(--t3)' }}>
+              {status}
+            </span>
+          )}
+        </span>
       </button>
     )
   }
@@ -676,8 +743,9 @@ function TypeRow({
     <button
       role="radio"
       aria-checked={on}
-      disabled={!available}
+      disabled={!offered}
       onClick={onPick}
+      title={offered ? undefined : 'This type is not sold in this location'}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -685,12 +753,10 @@ function TypeRow({
         width: '100%',
         minHeight: 64,
         padding: '10px 12px 10px 14px',
-        border: `1px solid ${on ? 'var(--accent)' : 'transparent'}`,
-        borderBottom: `1px solid ${on ? 'var(--accent)' : 'var(--line)'}`,
-        opacity: available ? 1 : 0.4,
+        ...chrome,
       }}
     >
-      <span style={{ width: 12, height: 12, flex: 'none', background: on ? 'var(--accent)' : undefined, boxShadow: on ? undefined : 'inset 0 0 0 1.5px var(--ctrl2)' }} />
+      <span style={dot} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <span className="num" style={{ display: 'block', fontSize: 16 }}>{t.name.toUpperCase()}</span>
         <span className="m t3" style={{ display: 'block', fontSize: 11, marginTop: 3 }}>
@@ -698,9 +764,19 @@ function TypeRow({
         </span>
       </span>
       <span style={{ textAlign: 'right' }}>
-        <span className="num" style={{ display: 'block', fontSize: 14 }}>{available ? euro(price?.monthly ?? 0) : '—'}</span>
-        <span className="m t3" style={{ display: 'block', fontSize: 10.5, marginTop: 3 }}>
-          {available ? `${euro(price?.hourly ?? 0, 4)}/h` : 'UNAVAILABLE HERE'}
+        <span className="num" style={{ display: 'block', fontSize: 14 }}>{available && price ? euro(price.monthly) : '—'}</span>
+        <span
+          className="m"
+          style={{
+            display: 'block',
+            fontSize: 10.5,
+            marginTop: 3,
+            letterSpacing: queued ? '.08em' : undefined,
+            textTransform: queued ? 'uppercase' : undefined,
+            color: queued ? 'var(--warn)' : 'var(--t3)',
+          }}
+        >
+          {available ? `${euro(price?.hourly ?? 0, 4)}/h` : status}
         </span>
       </span>
     </button>

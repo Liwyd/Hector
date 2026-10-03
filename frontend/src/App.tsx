@@ -8,6 +8,7 @@ import ServerDetail from './screens/ServerDetail'
 import Rescale from './screens/Rescale'
 import NewServer from './screens/NewServer'
 import Created from './screens/Created'
+import QueueScreen from './screens/Queue'
 import Storage from './screens/resources/Storage'
 import ImagesScreen from './screens/resources/Images'
 import NetworkScreen from './screens/resources/Network'
@@ -109,6 +110,7 @@ export default function App() {
           </RequireAuth>
         }
       />
+      <Route path="/queue" element={guarded(<QueueScreen />)} />
       <Route path="/storage" element={guarded(<Storage />)} />
       <Route path="/images" element={guarded(<ImagesScreen />)} />
       <Route path="/network" element={guarded(<NetworkScreen />)} />
