@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { API, notifyChanged } from '../api'
-import { useAsync } from '../hooks'
+import { copyText, useAsync } from '../hooks'
 import { Ic } from '../icons'
 import { Overlay } from '../components/sheets'
 import { BTN, DialogButtons } from '../components/confirm'
@@ -121,7 +121,26 @@ export default function DeleteSheet({
 
         <div style={{ marginTop: 18 }}>
           <label className="lbl" htmlFor="del-confirm">
-            Type <span style={{ color: 'var(--fg)', textTransform: 'none', letterSpacing: 0 }}>'{detail.name}'</span> to confirm
+            Type{' '}
+            {/* the name to type, one click away from the clipboard; same type as
+                the label — button only because it inherits the label's font */}
+            <button
+              type="button"
+              title="Copy the name"
+              onClick={() =>
+                void copyText(detail.name).then((ok) =>
+                  toast.push(
+                    ok
+                      ? { kind: 'success', title: 'Server name copied' }
+                      : { kind: 'error', title: 'Copy failed', detail: detail.name },
+                  ),
+                )
+              }
+              style={{ color: 'var(--fg)', textTransform: 'none', letterSpacing: 0 }}
+            >
+              '{detail.name}'
+            </button>{' '}
+            to confirm
           </label>
           <div className="field" style={match ? { borderColor: 'var(--accent)' } : undefined}>
             <input
