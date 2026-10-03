@@ -30,6 +30,14 @@ type Config struct {
 	AdminPassword string
 	// HS256 secret; empty generates a random one (sessions die on restart).
 	JwtSecret string
+
+	// Where the panel is allowed to keep state on disk. The repo has no
+	// database; this holds the out-of-stock order queue. Default "./data" is
+	// relative to the working directory, which the installer sets per
+	// instance, so two panels on one host never share a file.
+	DataDir string
+	// How often the queue re-checks stock, in seconds.
+	QueuePollSeconds int
 }
 
 // Cfg is the process-wide configuration, loaded once in main.
@@ -47,6 +55,12 @@ func Load() {
 		AdminUsername: getEnv("ADMIN_USERNAME", "admin"),
 		AdminPassword: os.Getenv("ADMIN_PASSWORD"),
 		JwtSecret:     os.Getenv("JWT_SECRET"),
+
+		DataDir:          getEnv("HECTOR_DATA_DIR", "data"),
+		QueuePollSeconds: getEnvInt("QUEUE_POLL_SECONDS", 300),
+	}
+	if Cfg.QueuePollSeconds < 5 {
+		Cfg.QueuePollSeconds = 5 // a faster loop would burn the Hetzner quota for nothing
 	}
 
 	if Cfg.AdminPassword == "" {

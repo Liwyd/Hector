@@ -5,7 +5,8 @@ https://github.com/user-attachments/assets/5b54b18a-e1ad-436f-83ea-656eb4f524be
 A single-admin web panel for the **Hetzner Cloud API**. One Go binary
 (Fiber v2) serves both the API and an embedded React app — there is no
 database; everything comes live from `api.hetzner.cloud`, optionally through
-a SOCKS5 or HTTP proxy.
+a SOCKS5 or HTTP proxy. The one file the panel writes itself is the order
+queue in `HECTOR_DATA_DIR`.
 
 ## Features
 
@@ -22,6 +23,9 @@ a SOCKS5 or HTTP proxy.
   - **system** — a project-wide activity feed of every running / finished action
 - rate-limit aware Hetzner client (429 + `Retry-After`, quota readout)
 - pricing / catalog helpers for picking a server
+- **order queue** — a sold-out server type can be ordered instead of built:
+  Hector re-checks stock every `QUEUE_POLL_SECONDS` and creates it, with the
+  confirmed settings, the moment it returns
 - single admin login (JWT session), dark "Red Grid" UI, mobile + desktop
 
 ## Requirements
@@ -230,9 +234,13 @@ environment, and a real environment variable always wins over the file.
 | `API_PORT` | no | defaults to `8787` |
 | `PROXY_URL` | no | SOCKS5 or HTTP proxy for **all** `api.hetzner.cloud` traffic (`socks5://user:pass@host:port`, `http://…`, or bare `host:port`; `SOCKS_PROXY` works as an alias) |
 | `HCLOUD_API_URL` | no | API base override — development against a local mock only |
+| `HECTOR_DATA_DIR` | no | directory for the panel's own state, defaults to `data` in the working directory |
+| `QUEUE_POLL_SECONDS` | no | how often a queued out-of-stock order re-checks stock, defaults to `300` (5 minutes) |
 
 There is no database: every value the panel shows comes live from the Hetzner
-Cloud API, optionally through the proxy above.
+Cloud API, optionally through the proxy above. The only file the panel writes
+is the order queue in `HECTOR_DATA_DIR` — it survives a restart so a stock
+alert is never lost.
 
 ## Development
 

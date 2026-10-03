@@ -24,6 +24,13 @@ func RegisterRoutes(app *fiber.App) {
 
 	auth.Get("/catalog", handlers.Catalog)
 
+	// out-of-stock order queue — the panel's own state
+	auth.Get("/order-queue", handlers.OrderQueueList)
+	auth.Post("/order-queue", handlers.OrderQueueAdd)
+	auth.Post("/order-queue/check", handlers.OrderQueueCheck)
+	auth.Delete("/order-queue/:id", handlers.OrderQueueRemove)
+	auth.Post("/order-queue/:id/forget", handlers.OrderQueueForgetSecret)
+
 	auth.Post("/servers", handlers.ServerCreate)
 	auth.Get("/servers/:id", handlers.ServerGet)
 	auth.Put("/servers/:id", handlers.ServerRename)

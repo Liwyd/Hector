@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"hector/backend/hetzner"
 	"hector/backend/types"
 )
 
@@ -44,26 +45,10 @@ func Catalog(ctx context.Context) (*types.Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	isos, _ := hcloud.ISOs(ctx)               // ISO list is best-effort
-	datacenters, _ := hcloud.Datacenters(ctx) // availability is best-effort
+	isos, _ := hcloud.ISOs(ctx) // ISO list is best-effort
 	idx, _ := prices(ctx)
 
-	// Availability: prefer the server type's own per-location flags (the
-	// modern source); fall back to the datacenters endpoint when absent.
-	available := map[string]map[int64]bool{}
-	for _, dc := range datacenters {
-		if dc.ServerTypes == nil {
-			continue
-		}
-		set := available[dc.Location.Name]
-		if set == nil {
-			set = map[int64]bool{}
-			available[dc.Location.Name] = set
-		}
-		for _, id := range dc.ServerTypes.Available {
-			set[id] = true
-		}
-	}
+	avail := newAvailabilityIndex(ctx, typesRaw)
 
 	cat := &types.Catalog{
 		Currency:      currencyOr(idx, "EUR"),
@@ -124,25 +109,13 @@ func Catalog(ctx context.Context) (*types.Catalog, error) {
 			Deprecated: st.Deprecated,
 			Prices:     map[string]types.TypePrice{},
 		}
-		ownAvailability := map[string]bool{}
-		for _, loc := range st.Locations {
-			ownAvailability[loc.Name] = loc.Available
-		}
 		for _, p := range st.Prices {
 			code := locCode(p.Location)
-			avail := false
-			switch {
-			case len(ownAvailability) > 0:
-				avail = ownAvailability[p.Location]
-			default:
-				locSet, hasAvail := available[p.Location]
-				avail = !hasAvail || locSet[st.ID]
-			}
 			entry.Prices[code] = types.TypePrice{
 				Monthly:    shownPrice(p.PriceMonthly),
 				Hourly:     shownPrice(p.PriceHourly),
 				IncludedGB: p.IncludedTraffic >> 30,
-				Available:  avail,
+				Available:  avail.isAvailable(st, p.Location),
 			}
 		}
 		cat.ServerTypes = append(cat.ServerTypes, entry)
@@ -188,4 +161,63 @@ func Catalog(ctx context.Context) (*types.Catalog, error) {
 
 	catalogCache.set("catalog", cat, catalogTTL)
 	return cat, nil
+}
+
+// availabilityIndex answers "is this server type sold in this location".
+// It is the one place that question is answered, so the New server screen
+// and an order-queue stock check can never disagree.
+//
+// The modern source is the server type's own per-location flags; the
+// datacenters endpoint is only fetched when some type does not carry them.
+type availabilityIndex struct {
+	byID map[string]map[int64]bool  // location name -> type id -> available
+	own  map[string]map[string]bool // type name -> location name -> available
+}
+
+func newAvailabilityIndex(ctx context.Context, typesRaw []hetzner.ServerType) availabilityIndex {
+	idx := availabilityIndex{
+		byID: map[string]map[int64]bool{},
+		own:  map[string]map[string]bool{},
+	}
+
+	needsFallback := false
+	for _, st := range typesRaw {
+		if len(st.Locations) == 0 {
+			needsFallback = true
+			continue
+		}
+		m := make(map[string]bool, len(st.Locations))
+		for _, loc := range st.Locations {
+			m[loc.Name] = loc.Available
+		}
+		idx.own[st.Name] = m
+	}
+	if !needsFallback {
+		return idx // one Hetzner request instead of two
+	}
+
+	// best-effort, as before: without it an unknown location counts as available
+	datacenters, _ := hcloud.Datacenters(ctx)
+	for _, dc := range datacenters {
+		if dc.ServerTypes == nil {
+			continue
+		}
+		set := idx.byID[dc.Location.Name]
+		if set == nil {
+			set = map[int64]bool{}
+			idx.byID[dc.Location.Name] = set
+		}
+		for _, id := range dc.ServerTypes.Available {
+			set[id] = true
+		}
+	}
+	return idx
+}
+
+func (idx availabilityIndex) isAvailable(st hetzner.ServerType, location string) bool {
+	if own, ok := idx.own[st.Name]; ok {
+		return own[location]
+	}
+	locSet, hasAvail := idx.byID[location]
+	return !hasAvail || locSet[st.ID]
 }

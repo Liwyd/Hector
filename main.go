@@ -29,6 +29,7 @@ func main() {
 	services.Init(client)
 	log.Printf("[hetzner] client ready (token: %v, proxy: %v)", client.Configured(), config.Cfg.Proxy != "")
 	logProbe(client.Probe(context.Background()))
+	services.StartQueueWorker()
 
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,

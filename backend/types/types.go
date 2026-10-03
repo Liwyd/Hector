@@ -255,6 +255,33 @@ type CreateResult struct {
 	RootPassword string       `json:"rootPassword"`
 }
 
+// ---- order queue (stock waits) -----------------------------------------
+
+// QueueEntry is one out-of-stock order. The whole create payload is kept
+// verbatim, so the build that finally happens is exactly what the user
+// confirmed — name, image, cloud-init, the lot. RootPassword is the one
+// secret Hetzner hands out once; it is written to disk with the rest of the
+// entry because losing it to a restart would mean losing it for good.
+type QueueEntry struct {
+	ID           string        `json:"id"`
+	CreatedAt    time.Time     `json:"createdAt"`
+	Status       string        `json:"status"` // waiting | creating | done | failed
+	Request      CreateRequest `json:"request"`
+	Attempts     int           `json:"attempts"`
+	LastCheckAt  time.Time     `json:"lastCheckAt,omitempty"`
+	NextCheckAt  time.Time     `json:"nextCheckAt"`
+	LastError    string        `json:"lastError,omitempty"`
+	ServerID     int64         `json:"serverId,omitempty"`
+	ServerName   string        `json:"serverName,omitempty"`
+	RootPassword string        `json:"rootPassword,omitempty"`
+}
+
+type QueueView struct {
+	Entries         []QueueEntry `json:"entries"`
+	IntervalSeconds int          `json:"intervalSeconds"`
+	LastPollAt      time.Time    `json:"lastPollAt,omitempty"`
+}
+
 // ---- jobs (multi-step orchestration, in memory) ------------------------
 
 type Job struct {

@@ -10,6 +10,9 @@ app.run.err.log
 # local secrets
 .env
 
+# panel state on disk (order queue)
+data/
+
 # local-only docs & reports - never for the public repo
 answer.html
 AGENTS.md

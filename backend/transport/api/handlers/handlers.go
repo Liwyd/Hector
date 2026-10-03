@@ -51,6 +51,18 @@ func fail(c *fiber.Ctx, err error) error {
 		status, code = fiber.StatusBadRequest, "action_not_allowed"
 	case errors.Is(err, services.ErrJobRunning):
 		status, code = fiber.StatusConflict, "job_running"
+	case errors.Is(err, services.ErrQueueInvalid):
+		status, code = fiber.StatusBadRequest, "invalid_request"
+	case errors.Is(err, services.ErrQueueAvailable):
+		status, code = fiber.StatusConflict, "queue_available"
+	case errors.Is(err, services.ErrQueueDuplicate):
+		status, code = fiber.StatusConflict, "queue_duplicate"
+	case errors.Is(err, services.ErrQueueFull):
+		status, code = fiber.StatusConflict, "queue_full"
+	case errors.Is(err, services.ErrQueueUnknownType):
+		status, code = fiber.StatusBadRequest, "queue_unknown_type"
+	case errors.Is(err, services.ErrQueueNotFound):
+		status, code = fiber.StatusNotFound, "queue_not_found"
 	case errors.As(err, &urlErr) || errors.As(err, &netErr):
 		status = fiber.StatusBadGateway
 		if config.Cfg.Proxy != "" {

@@ -40,6 +40,12 @@ func TestRegisterRoutesMatchesPublishedSurface(t *testing.T) {
 		"GET /api/fleet",
 		"GET /api/catalog",
 
+		"GET /api/order-queue",
+		"POST /api/order-queue",
+		"POST /api/order-queue/check",
+		"DELETE /api/order-queue/:id",
+		"POST /api/order-queue/:id/forget",
+
 		"POST /api/servers",
 		"GET /api/servers/:id",
 		"PUT /api/servers/:id",
