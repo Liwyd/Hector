@@ -37,7 +37,9 @@ export interface SubTab {
   end?: boolean
 }
 
-/** Grouped section rail: one row of links, groups split by hairlines. */
+/** Grouped section rail: one row of links, groups split by hairlines. The
+ *  group name is deliberately not rendered — a label inside a toolbar reads
+ *  as a disabled link, so the separators carry the grouping instead. */
 export function SectionNav() {
   const { pathname } = useLocation()
   const desktop = useIsDesktop()
@@ -59,12 +61,7 @@ export function SectionNav() {
       </NavLink>
     )
     if (newGroup) {
-      nodes.push(
-        <div className="navgroup" key={`${s.group}-${i}`}>
-          {desktop && <span className="navtag">{s.group}</span>}
-          {link}
-        </div>,
-      )
+      nodes.push(<div className="navgroup" key={`${s.group}-${i}`}>{link}</div>)
     } else {
       nodes.push(link)
     }
