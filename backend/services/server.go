@@ -170,6 +170,11 @@ func ServerAction(ctx context.Context, id int64, name string, payload map[string
 	if err != nil {
 		return nil, err
 	}
+	if name == "create_image" {
+		// a new snapshot has to be in the rebuild picker of every other
+		// server right away, not when the catalog cache expires
+		invalidateCatalog()
+	}
 
 	out := &ActionResult{Action: actionInfo(res.Action)}
 	if res.RootPassword != nil {

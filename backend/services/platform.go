@@ -353,6 +353,7 @@ func ImageUpdate(ctx context.Context, id int64, req types.ImageUpdateRequest) (*
 	if err != nil {
 		return nil, err
 	}
+	invalidateCatalog()
 	out := toImage(*img)
 	return &out, nil
 }
@@ -362,6 +363,7 @@ func ImageDelete(ctx context.Context, id int64) error {
 	if err := hcloud.ImageDelete(ctx, id); err != nil {
 		return err
 	}
+	invalidateCatalog()
 	return nil
 }
 

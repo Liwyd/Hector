@@ -12,6 +12,14 @@ var catalogCache = newTTLCache[*types.Catalog]()
 
 const catalogTTL = 10 * time.Minute
 
+// invalidateCatalog drops the cached catalog. It carries the image list that
+// the New server and Rebuild pickers read, so an image that is created,
+// renamed or deleted has to reach those screens now — not whenever the TTL
+// happens to run out. Without this a snapshot taken on one server stays
+// invisible in the rebuild dialog of every other server for up to ten
+// minutes, even though it is already in the Images list.
+func invalidateCatalog() { catalogCache.del("catalog") }
+
 // Catalog is everything the New server screen and the Rescale screen need:
 // locations, system images, server types with per-location prices and
 // availability, and SSH keys.
