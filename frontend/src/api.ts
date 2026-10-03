@@ -51,6 +51,10 @@ export function notifyChanged() {
  *  to rebuild, which would cost 1 + N Hetzner requests. */
 export function notifyResource(prefix: string) {
   cache.expire(prefix)
+  // Images matter twice: the rebuild and new-server pickers read the
+  // catalog, so a snapshot taken on one server has to show up there right
+  // away instead of waiting out the catalog's 10 minute TTL.
+  if (prefix === 'images') cache.expire('catalog')
   window.dispatchEvent(new Event('hector:changed'))
 }
 

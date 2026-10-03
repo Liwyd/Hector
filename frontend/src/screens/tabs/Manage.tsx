@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { API, CATALOG_CACHE, notifyChanged } from '../../api'
+import { API, CATALOG_CACHE, notifyChanged, notifyResource } from '../../api'
 import { copyText, useAsync, useIsDesktop } from '../../hooks'
 import { toServerName } from '../../format'
 import { Ic } from '../../icons'
@@ -591,7 +591,12 @@ function SnapshotDialog({ open, onClose, detail, onDone }: { open: boolean; onCl
       API.action(detail.id, 'create_image', { type: 'snapshot', description: description.trim() || `${detail.name} snapshot` }),
     )
     setBusy(false)
-    if (res) onDone()
+    if (res) {
+      // the rebuild picker on every other server reads the catalog — a
+      // snapshot that takes a minute to appear is a snapshot nobody finds
+      notifyResource('images')
+      onDone()
+    }
   }
 
   return (
