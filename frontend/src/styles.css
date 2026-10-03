@@ -127,9 +127,6 @@
   --move:#7AA7FF; --move-line:#263A5E;
   /* a picked out-of-stock type: the order-queue state */
   --queue-sel:#231D10; --queue-line:#6B5320;
-  /* the order queue's light — always translucent, dark theme gets the deeper
-     one; it tints the page from behind instead of repainting it */
-  --queue-wash:rgba(236,182,44,.26);
   --bar:#D2D1CC; --bar2:#767670;
   --scrim:rgba(0,0,0,.62); --scrim2:rgba(0,0,0,.66); --avg-line:rgba(216,217,213,.5);
 }
@@ -148,8 +145,6 @@ html[data-theme="light"]{
   --move:#2F6FEB; --move-line:#C3D3F5;
   /* a picked out-of-stock type: the order-queue state */
   --queue-sel:#FFF7E4; --queue-line:#E3C98A;
-  /* the order queue's light: brighter yellow over the light theme's page */
-  --queue-wash:rgba(255,214,50,.55);
   --bar:#232320; --bar2:#9C9C94;
   --scrim:rgba(20,20,20,.4); --scrim2:rgba(20,20,20,.45); --avg-line:rgba(20,20,20,.4);
 }
@@ -291,22 +286,3 @@ button,.btn,.chip,.tab,.sw,.tile,.bkc,[style*="crosshair"]{user-select:none;-web
 .field-ta:focus-within{border-color:var(--ctrl)}
 .field-ta textarea{flex:1;background:transparent;border:0;outline:0;font-family:'Geist Mono',monospace;font-size:12.5px;line-height:1.5;resize:vertical;min-height:104px;color:var(--fg);padding:0}
 .field-ta textarea::placeholder{color:var(--t4)}
-
-/* ---- the order-queue light ----
-   Behind every screen (z-index:-1), never over it: while the queue owns the
-   room the page turns its own background off, so the yellow shows through and
-   the text keeps exactly the colour the theme gave it. The light itself is a
-   gradient half-tinted in --queue-wash — moving its position wipes the colour
-   up from the bottom and drains it back the same way (App.tsx drives the
-   states). It is never opaque: the yellow sits on the theme, it does not
-   replace it. */
-.queue-wash{position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background-image:linear-gradient(to bottom,transparent 0 50%,var(--queue-wash) 50% 100%);
-  background-size:100% 200%;background-repeat:no-repeat;background-position:0% 0%;
-  transition:background-position .66s cubic-bezier(.22,1,.36,1)}
-.q-rise,.q-rest{background-position:0% 100%}
-.q-fall{background-position:0% 0%;transition:background-position .6s cubic-bezier(.4,0,.75,.5)}
-.q-idle{background-position:0% 0%;transition:none}
-/* the page field steps aside so the light behind it is what you see */
-html[data-queue] .page{background:transparent}
-@media (prefers-reduced-motion:reduce){.queue-wash{transition:none}}
